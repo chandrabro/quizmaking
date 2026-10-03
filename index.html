@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QuizReel – Quiz Video Maker</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#eef0f4;--panel:#fff;--ink:#14161f;--mute:#5d6475;--line:#d9dde6;--acc:#2f5bff;--ok:#12a150;--bad:#e5484d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1017;--panel:#171a24;--ink:#eef0f6;--mute:#9aa2b5;--line:#2a2f3d}}
+:root[data-theme="dark"]{--bg:#0e1017;--panel:#171a24;--ink:#eef0f6;--mute:#9aa2b5;--line:#2a2f3d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Space Grotesk",system-ui,sans-serif}
+header{padding:18px 20px 6px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:26px;letter-spacing:-.02em}
+header span{color:var(--mute)}
+main{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:16px;padding:12px 20px 24px;max-width:1400px;margin:auto}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+h2{margin:0 0 10px;font-size:16px}
+label{display:block;font-size:13px;color:var(--mute);margin:8px 0 3px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;font-weight:500;padding:9px 14px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff}
+button.r{background:var(--bad);border-color:var(--bad);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.stage{background:#000;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+canvas{display:block;margin:0 auto;max-width:100%;max-height:75vh}
+ol{margin:0;padding:0;list-style:none;max-height:300px;overflow:auto}
+li{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+li b{color:var(--acc);min-width:24px}
+li .t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+li button{padding:3px 8px}
+.hint{font-size:13px;color:var(--mute)}
+.msg{font-size:13px;margin-top:8px;min-height:18px}
+table{border-collapse:collapse;font-size:12px;margin-top:6px;width:100%}
+td,th{border:1px solid var(--line);padding:3px 6px;text-align:left}
+video{width:100%;border-radius:8px;margin-top:8px;background:#000}
+</style>
+</head>
+<body>
+<header><h1>QuizReel</h1><span>Build a timed quiz, then record it as a video.</span></header>
+<main>
+<div>
+  <section>
+    <h2>Add a question</h2>
+    <label for="fq">Question</label><textarea id="fq" rows="2"></textarea>
+    <div class="row">
+      <div><label for="fa">Option A</label><input id="fa"></div>
+      <div><label for="fb">Option B</label><input id="fb"></div>
+      <div><label for="fc">Option C</label><input id="fc"></div>
+      <div><label for="fd">Option D</label><input id="fd"></div>
+    </div>
+    <label for="fx">Correct answer</label>
+    <select id="fx"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select>
+    <div class="btns"><button class="p" id="add">Add question</button><button id="clr" hidden>Cancel edit</button></div>
+    <div class="msg" id="fmsg"></div>
+  </section>
+  <section>
+    <h2>Bulk upload from Excel</h2>
+    <input type="file" id="xl" accept=".xlsx,.xls,.csv">
+    <p class="hint">First row must be headers. Each row is one question:</p>
+    <table><tr><th>Question</th><th>A</th><th>B</th><th>C</th><th>D</th><th>Answer</th></tr>
+    <tr><td>Capital of Nepal?</td><td>Pokhara</td><td>Kathmandu</td><td>Biratnagar</td><td>Lalitpur</td><td>B</td></tr></table>
+    <p class="hint">Answer can be A–D, 1–4, or the option text. Uploaded rows are added to the list.</p>
+    <div class="msg" id="xmsg"></div>
+  </section>
+  <section>
+    <h2>Questions (<span id="cnt">0</span>)</h2>
+    <ol id="list"></ol>
+    <div class="btns"><button id="shuf">Shuffle order</button><button id="empty">Remove all</button></div>
+  </section>
+</div>
+<div>
+  <section>
+    <div class="stage"><canvas id="cv" width="1280" height="720"></canvas></div>
+    <div class="row" style="margin-top:6px">
+      <div><label for="dur">Seconds to answer</label><input type="number" id="dur" value="10" min="3" max="120"></div>
+      <div><label for="rev">Seconds to show answer</label><input type="number" id="rev" value="4" min="1" max="20"></div>
+      <div><label for="ar">Video shape</label><select id="ar"><option value="land">16:9 landscape (YouTube)</option><option value="port">9:16 vertical (Shorts, Reels, TikTok)</option><option value="sq">1:1 square (Instagram, Facebook)</option></select></div>
+      <div><label for="th">Look</label><select id="th"><option>Midnight</option><option>Sunset</option><option>Forest</option></select></div>
+      <div><label for="ttl">Video title</label><input id="ttl" value="Quick Quiz"></div>
+    </div>
+    <div class="btns">
+      <button class="p" id="play">Preview</button>
+      <button class="r" id="rec">Record video</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+    <div class="msg" id="pmsg">Recording captures the canvas and the tick sounds as a WebM video.</div>
+    <div id="out" hidden>
+      <h2 style="margin-top:12px">Your video</h2>
+      <video id="vid" controls playsinline></video>
+      <div class="btns"><button class="p" id="dl">Download video (.webm)</button></div>
+      <div class="msg" id="dmsg"></div>
+    </div>
+  </section>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$('cv'),x=cv.getContext('2d');
+const THEMES={Midnight:['#0f172a','#1e293b','#6366f1'],Sunset:['#3b0764','#9d174d','#f59e0b'],Forest:['#052e16','#14532d','#34d399']};
+let Q=[{q:'Which planet is known as the Red Planet?',o:['Venus','Mars','Jupiter','Mercury'],a:1},
+{q:'How many continents are there on Earth?',o:['5','6','7','8'],a:2},
+{q:'What is the largest ocean?',o:['Atlantic','Indian','Arctic','Pacific'],a:3}];
+let editIdx=-1,run=null,outBlob=null;
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function renderList(){
+  $('cnt').textContent=Q.length;
+  $('list').innerHTML=Q.map((k,i)=>`<li><b>${i+1}</b><span class="t" data-e="${i}">${esc(k.q)}</span><button data-d="${i}" aria-label="Delete question ${i+1}">✕</button></li>`).join('')||'<li class="hint">No questions yet. Add one or upload a spreadsheet.</li>';
+  draw(null);
+}
+$('list').onclick=e=>{
+  const d=e.target.dataset;
+  if(d.d!==undefined){Q.splice(+d.d,1);renderList()}
+  else if(d.e!==undefined){const k=Q[+d.e];editIdx=+d.e;$('fq').value=k.q;['fa','fb','fc','fd'].forEach((id,i)=>$(id).value=k.o[i]);$('fx').value=k.a;$('add').textContent='Save changes';$('clr').hidden=false}
+};
+function resetForm(){editIdx=-1;['fq','fa','fb','fc','fd'].forEach(id=>$(id).value='');$('fx').value=0;$('add').textContent='Add question';$('clr').hidden=true}
+$('clr').onclick=resetForm;
+$('add').onclick=()=>{
+  const k={q:$('fq').value.trim(),o:['fa','fb','fc','fd'].map(id=>$(id).value.trim()),a:+$('fx').value};
+  if(!k.q||k.o.some(v=>!v)){$('fmsg').textContent='Fill in the question and all four options.';return}
+  if(editIdx>=0)Q[editIdx]=k;else Q.push(k);
+  $('fmsg').textContent=editIdx>=0?'Changes saved.':'Question added.';
+  resetForm();renderList();
+};
+$('shuf').onclick=()=>{for(let i=Q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[Q[i],Q[j]]=[Q[j],Q[i]]}renderList()};
+$('empty').onclick=()=>{if(Q.length&&confirm('Remove all questions?')){Q=[];renderList()}};
+
+// Excel / CSV bulk upload
+$('xl').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    let ok=0,skip=0;
+    for(const r of rows){
+      const m={};for(const key in r)m[key.toString().toLowerCase().replace(/[^a-z0-9]/g,'')]=String(r[key]).trim();
+      const q=m.question||m.q;
+      const o=['a','b','c','d'].map((l,i)=>m[l]||m['option'+l]||m['option'+(i+1)]||m[String(i+1)]||'');
+      let ans=(m.answer||m.correct||m.correctanswer||'').trim(),a=-1;
+      if(/^[a-d]$/i.test(ans))a='abcd'.indexOf(ans.toLowerCase());
+      else if(/^[1-4]$/.test(ans))a=+ans-1;
+      else a=o.findIndex(v=>v&&v.toLowerCase()===ans.toLowerCase());
+      if(q&&o.every(Boolean)&&a>=0){Q.push({q,o,a});ok++}else skip++;
+    }
+    $('xmsg').textContent=`Added ${ok} question${ok===1?'':'s'}`+(skip?`, skipped ${skip} incomplete row${skip===1?'':'s'}.`:'.');
+    renderList();
+  }catch(err){$('xmsg').textContent='Could not read that file. Use .xlsx, .xls or .csv.'}
+  e.target.value='';
+};
+
+// Canvas rendering
+const LAY={
+ land:{W:1280,H:720,rx:1150,ry:80,R:44,qx:80,qy:175,qw:1120,maxL:3,qfs:50,cols:2,bw:560,bh:110,gx:40,gy:26,ox:80,oy:360,hf:28,ofs:34,full:1},
+ port:{W:720,H:1280,rx:630,ry:110,R:46,qx:60,qy:270,qw:600,maxL:5,qfs:48,cols:1,bw:600,bh:120,gx:0,gy:24,ox:60,oy:640,hf:26,ofs:32,full:0},
+ sq:{W:1000,H:1000,rx:910,ry:90,R:42,qx:70,qy:190,qw:860,maxL:3,qfs:46,cols:2,bw:415,bh:170,gx:30,gy:24,ox:70,oy:510,hf:24,ofs:30,full:1}};
+const lay=()=>LAY[$('ar').value];
+function setSize(){const L=lay();cv.width=L.W;cv.height=L.H}
+function wrap(t,maxW,font){x.font=font;const w=t.split(' ');let l='',ls=[];for(const s of w){const n=l?l+' '+s:s;if(x.measureText(n).width>maxW&&l){ls.push(l);l=s}else l=n}ls.push(l);return ls}
+function rr(a,b,w,h,r){x.beginPath();x.roundRect(a,b,w,h,r)}
+function draw(s){
+  const L=lay(),W=L.W,H=L.H,T=THEMES[$('th').value],F='"Space Grotesk",system-ui,sans-serif';
+  const g=x.createLinearGradient(0,0,W,H);g.addColorStop(0,T[0]);g.addColorStop(1,T[1]);x.fillStyle=g;x.fillRect(0,0,W,H);
+  x.textBaseline='middle';x.fillStyle='#fff';
+  const ctr=(t,fs,y,al,wt)=>{const f=`${wt} ${fs}px ${F}`,ls=wrap(t,W-120,f),lh=fs+12;x.globalAlpha=al;x.textAlign='center';x.font=f;ls.forEach((l,n)=>x.fillText(l,W/2,y+n*lh-(ls.length-1)*lh/2));x.globalAlpha=1};
+  if(!s){ctr($('ttl').value||'Quiz',72,H/2-40,1,700);ctr(`${Q.length} questions · ${$('dur').value}s each`,32,H/2+70,.7,400);return}
+  if(s.end){ctr('How many did you get?',64,H/2-30,1,700);ctr('Like, share and try the next one',30,H/2+70,.7,400);return}
+  const k=Q[s.i],rev=s.phase==='r';
+  x.textAlign='left';x.font=`500 ${L.hf}px ${F}`;x.globalAlpha=.75;
+  x.fillText(L.full?`${$('ttl').value}  ·  Question ${s.i+1} of ${Q.length}`:`Question ${s.i+1} of ${Q.length}`,L.qx-20>0?L.qx-20+20:40,L.ry-28);x.globalAlpha=1;
+  const cx=L.rx,cy=L.ry,R=L.R,frac=rev?1:s.left/s.total;
+  x.lineWidth=10;x.strokeStyle='rgba(255,255,255,.2)';x.beginPath();x.arc(cx,cy,R,0,7);x.stroke();
+  x.strokeStyle=rev?'#34d399':(s.left<=3?'#ff6b6b':T[2]);x.beginPath();x.arc(cx,cy,R,-Math.PI/2,-Math.PI/2+Math.PI*2*frac);x.stroke();
+  x.fillStyle='#fff';x.textAlign='center';x.font=`700 ${Math.round(R*.85)}px ${F}`;x.fillText(rev?'✓':Math.ceil(s.left),cx,cy+2);
+  let fs=L.qfs+4,ls;do{fs-=4;ls=wrap(k.q,L.qw,`700 ${fs}px ${F}`)}while(ls.length>L.maxL&&fs>26);
+  x.textAlign='left';x.font=`700 ${fs}px ${F}`;
+  ls.forEach((l,n)=>x.fillText(l,L.qx,L.qy+n*(fs+10)));
+  k.o.forEach((o,n)=>{
+    const bx=L.ox+(n%L.cols)*(L.bw+L.gx),by=L.oy+Math.floor(n/L.cols)*(L.bh+L.gy),right=n===k.a;
+    x.globalAlpha=rev&&!right?.3:1;
+    rr(bx,by,L.bw,L.bh,16);x.fillStyle=rev&&right?'#12a150':'rgba(255,255,255,.12)';x.fill();
+    x.lineWidth=3;x.strokeStyle=rev&&right?'#6ee7a8':'rgba(255,255,255,.3)';x.stroke();
+    rr(bx+18,by+(L.bh-56)/2,56,56,12);x.fillStyle=rev&&right?'#fff':T[2];x.fill();
+    x.fillStyle=rev&&right?'#12a150':'#fff';x.textAlign='center';x.font=`700 30px ${F}`;x.fillText('ABCD'[n],bx+46,by+L.bh/2+1);
+    x.fillStyle='#fff';x.textAlign='left';
+    let of=L.ofs+3,ol;do{of-=3;ol=wrap(o,L.bw-120,`500 ${of}px ${F}`)}while(ol.length>2&&of>18);
+    x.font=`500 ${of}px ${F}`;const m2=Math.min(ol.length,2);
+    ol.slice(0,2).forEach((l,m)=>x.fillText(l,bx+94,by+L.bh/2+(m-(m2-1)/2)*(of+4)));
+    x.globalAlpha=1;
+  });
+  x.fillStyle='rgba(255,255,255,.15)';x.fillRect(0,H-10,W,10);x.fillStyle=T[2];x.fillRect(0,H-10,W*((s.i+(rev?1:1-s.left/s.total))/Q.length),10);
+}
+
+// Audio
+let ac,dest;
+function beep(f,d=.12,v=.15){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(g);g.connect(ac.destination);g.connect(dest);o.start();o.stop(ac.currentTime+d)}
+
+// Playback + recording
+function start(record){
+  if(!Q.length){$('pmsg').textContent='Add at least one question first.';return}
+  if(run)return;
+  const dur=Math.max(3,+$('dur').value||10),rev=Math.max(1,+$('rev').value||4),seg=dur+rev,end=2,total=Q.length*seg+end;
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)();dest=ac.createMediaStreamDestination();ac.resume();
+  let mr=null,chunks=[];
+  if(record){
+    const st=cv.captureStream(30);dest.stream.getAudioTracks().forEach(t=>st.addTrack(t));
+    const mt=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+    if(!mt){$('pmsg').textContent='This browser cannot record video. Try Chrome, Edge or Firefox on a computer.';return}
+    mr=new MediaRecorder(st,{mimeType:mt,videoBitsPerSecond:4e6});mr.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+    mr.onstop=()=>{const b=new Blob(chunks,{type:'video/webm'});outBlob=b;$('dmsg').textContent='';$('vid').src=URL.createObjectURL(b);$('out').hidden=false;$('pmsg').textContent='Done. Your video is ready below.'};
+    mr.start(500);
+  }
+  $('play').disabled=$('rec').disabled=$('ar').disabled=true;$('stop').disabled=false;
+  const t0=performance.now();let lastTick=-1,lastPhase='';
+  const loop=now=>{
+    if(!run)return;
+    const el=(now-t0)/1000;
+    if(el>=total){finish();return}
+    if(el>=Q.length*seg){draw({end:true})}
+    else{
+      const i=Math.floor(el/seg),w=el-i*seg,ph=w<dur?'q':'r',left=Math.max(0,dur-w);
+      draw({i,phase:ph,left,total:dur});
+      const key=i+ph;
+      if(ph==='q'&&left<=3&&Math.ceil(left)!==lastTick){lastTick=Math.ceil(left);beep(660)}
+      if(key!==lastPhase){lastPhase=key;if(ph==='r'){beep(880,.25,.2);setTimeout(()=>beep(1175,.3,.2),150)}else lastTick=-1}
+      $('pmsg').textContent=(record?'Recording… ':'Previewing… ')+`question ${i+1} of ${Q.length}`;
+    }
+    run.raf=requestAnimationFrame(loop);
+  };
+  function finish(){cancelAnimationFrame(run.raf);run=null;if(mr&&mr.state!=='inactive')setTimeout(()=>mr.stop(),400);else if(!mr)$('pmsg').textContent='Preview finished.';
+    $('play').disabled=$('rec').disabled=$('ar').disabled=false;$('stop').disabled=true;draw(null)}
+  run={finish,raf:0};run.raf=requestAnimationFrame(loop);
+}
+$('play').onclick=()=>start(false);
+$('rec').onclick=()=>start(true);
+$('stop').onclick=()=>run&&run.finish();
+['th','ttl','dur'].forEach(id=>$(id).addEventListener('input',()=>!run&&draw(null)));
+$('ar').onchange=()=>{setSize();draw(null)};
+$('dl').onclick=async()=>{
+  if(!outBlob)return;
+  const name='quiz-'+$('ar').value+'-'+Date.now().toString(36)+'.webm';
+  try{
+    const d=window.claude&&claude.use?await claude.use('downloads'):null;
+    if(d){await d.save({filename:name,data:outBlob});$('dmsg').textContent='Saved.'}
+    else{const a=document.createElement('a');a.href=URL.createObjectURL(outBlob);a.download=name;document.body.appendChild(a);a.click();a.remove();$('dmsg').textContent='Download started.'}
+  }catch(e){$('dmsg').textContent=e&&e.code==='declined'?'Download cancelled.':'Could not save the file. Try the three-dot menu on the player.'}
+};
+setSize();renderList();
+(document.fonts&&document.fonts.ready||Promise.resolve()).then(()=>draw(null));
+</script>
+</body>
+</html>
